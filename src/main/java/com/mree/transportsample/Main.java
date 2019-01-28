@@ -3,39 +3,148 @@ package com.mree.transportsample;
 import com.mree.transportsample.model.Graph;
 import com.mree.transportsample.model.Path;
 import com.mree.transportsample.model.Place;
+import com.mree.transportsample.util.PrintUtils;
 
 import java.io.*;
 import java.util.*;
+
+import static com.mree.transportsample.util.PrintUtils.printMatrix;
 
 public class Main {
 
     private static List<Place> PLACES = new ArrayList<Place>();
     private static List<String[][]> LINK_WEIGHT_MATRIXES = new ArrayList<String[][]>();
+    private static Map<Integer, Long> populationMap = new TreeMap<Integer, Long>();
+    private static Map<String, Double> distanceMap = new TreeMap<String, Double>();
+    private static Map<String, Integer> tripMap = new TreeMap<String, Integer>();
+    private static Map<String, String[][]> linkWeightMap = new TreeMap<String, String[][]>();
+    private static Map<String, Double> flowObservedMap = new TreeMap<String, Double>();
+    private static Map<String, Double> flowGuessedMap = new TreeMap<String, Double>();
 
     public static void main(String[] args) {
         try {
-            ClassLoader classLoader = Main.class.getClassLoader();
-            File file = new File(classLoader.getResource("places.csv").getFile());
-            BufferedReader reader = new BufferedReader(new FileReader(file));
-
-            String line = reader.readLine();
-            int counter = 0;
-            while (line != null) {
-                PLACES.add(getPlaceFromLine(counter, line));
-                counter++;
-                line = reader.readLine();
-            }
-            reader.close();
+            readPlaces();
+            readPopulation();
+            readDistance();
 
             Graph graph = generateGraph();
 
             generateLinkWeightMatrixes(graph);
+            PrintUtils.printLinked(linkWeightMap);
+            generateTripMap(graph);
+            PrintUtils.printTrip(tripMap);
+            generateFlowObservedMap(graph);
+            PrintUtils.printFlow(flowObservedMap);
+            generateGuessedFlowMap(graph);
+            PrintUtils.printFlow(flowGuessedMap);
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static void generateTripMap(Graph graph) {
+        for (Path path : graph.getPaths()) {
+            String key = path.getSource().getId() + "" + path.getDestination().getId();
+            if (path.getSource().getId() > path.getDestination().getId()) {
+                key = path.getDestination().getId() + "" + path.getSource().getId();
+            }
+            Integer value = tripMap.get(key);
+            if (value == null)
+                value = 1;
+            else
+                value++;
+
+            tripMap.put(key, value);
+        }
+    }
+
+    private static void generateFlowObservedMap(Graph graph) {
+
+    }
+
+    private static void generateGuessedFlowMap(Graph graph) {
+        for (Path path : graph.getPaths()) {
+            Place source = path.getSource();
+            Place dest = path.getDestination();
+            String key = source.getId() + "" + dest.getId();
+            if (source.getId() > dest.getId())
+                continue;
+            String[][] matrix = linkWeightMap.get(key);
+            int i = 0, j = 1;
+            Double result = 0.0;
+            for (i = 0; i < PLACES.size(); i++) {
+                for (j = 0; i < PLACES.size(); i++) {
+                    String innerKey = i + "" + j;
+                    if (i > j)
+                        innerKey = j + "" + i;
+                    Integer trip = tripMap.get(innerKey);
+                    if (trip == null) {
+                        trip = 0;
+                    }
+                    result += trip * Double.parseDouble(matrix[i][j]);
+                }
+            }
+            flowGuessedMap.put(key, result);
+        }
+    }
+
+    private static void generateMattop() {
+        Double mattop = 0.0;
+
+        for (String key : linkWeightMap.keySet()) {
+
+        }
+    }
+
+    private static void readPlaces() throws IOException {
+        ClassLoader classLoader = Main.class.getClassLoader();
+        File file = new File(classLoader.getResource("places.csv").getFile());
+        BufferedReader reader = new BufferedReader(new FileReader(file));
+
+        String line = reader.readLine();
+        int counter = 0;
+        while (line != null) {
+            PLACES.add(getPlaceFromLine(counter, line));
+            counter++;
+            line = reader.readLine();
+        }
+        reader.close();
+    }
+
+    private static void readPopulation() throws IOException {
+        ClassLoader classLoader = Main.class.getClassLoader();
+        File file = new File(classLoader.getResource("population.txt").getFile());
+        BufferedReader reader = new BufferedReader(new FileReader(file));
+
+        String line = reader.readLine();
+        while (line != null) {
+            String[] split = line.split(";");
+            if (split == null || split.length != 2)
+                continue;
+            populationMap.put(Integer.parseInt(split[0]), Long.parseLong(split[1]));
+            line = reader.readLine();
+        }
+        reader.close();
+    }
+
+    private static void readDistance() throws IOException {
+        ClassLoader classLoader = Main.class.getClassLoader();
+        File file = new File(classLoader.getResource("distance.txt").getFile());
+        BufferedReader reader = new BufferedReader(new FileReader(file));
+
+        String line = reader.readLine();
+        while (line != null) {
+            String[] split = line.split(",");
+            if (split == null || split.length != 3)
+                continue;
+            String key = split[0] + split[1];
+            distanceMap.put(key, Double.parseDouble(split[2]));
+            line = reader.readLine();
+        }
+        reader.close();
     }
 
     private static Graph generateGraph() {
@@ -62,7 +171,7 @@ public class Main {
                     Place target = PLACES.get(j);
 
                     if (source == target) {
-                        matrix[i][j] = "0";
+                        matrix[i][j] = "0.0";
                     } else {
                         List<LinkedList<Place>> pathList = new ArrayList<LinkedList<Place>>();
                         List<LinkedList<Place>> filteredPathList = new ArrayList<LinkedList<Place>>();
@@ -119,9 +228,9 @@ public class Main {
                                     break;
                                 }
                             }
-                            matrix[i][j] = 1/count + "";
+                            matrix[i][j] = (1.0 / count) + "";
                         } else {
-                            matrix[i][j] = "0";
+                            matrix[i][j] = "0.0";
                         }
 
                     }
@@ -129,21 +238,17 @@ public class Main {
 
                 }
             }
+
+            String key = path.getSource().getId() + "" + path.getDestination().getId();
+            if (path.getSource().getId() > path.getDestination().getId())
+                key = path.getDestination().getId() + "" + path.getSource().getId();
+            linkWeightMap.put(key, matrix);
             LINK_WEIGHT_MATRIXES.add(matrix);
             System.out.println("Path: " + path.getSource() + "-" + path.getDestination());
             printMatrix(matrix);
         }
     }
 
-    private static void printMatrix(String[][] matrix) {
-        for (int i = 0; i < matrix.length; i++) {
-            for (int j = 0; j < matrix[i].length; j++) {
-                System.out.print(matrix[i][j] + " ");
-            }
-            System.out.println();
-        }
-        System.out.println();
-    }
 
     private static void depthFirst(Graph graph, LinkedList<Place> visited, Place end, List<LinkedList<Place>> pathList) {
         LinkedList<Place> nodes = graph.adjacentNodes(visited.getLast());
