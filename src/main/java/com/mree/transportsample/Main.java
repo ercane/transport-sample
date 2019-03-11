@@ -6,6 +6,7 @@ import com.mree.transportsample.model.Place;
 import com.mree.transportsample.util.PrintUtils;
 
 import java.io.*;
+import java.math.BigDecimal;
 import java.util.*;
 
 import static com.mree.transportsample.util.PrintUtils.printMatrix;
@@ -20,6 +21,7 @@ public class Main {
     private static Map<String, String[][]> linkWeightMap = new TreeMap<String, String[][]>();
     private static Map<String, Double> flowObservedMap = new TreeMap<String, Double>();
     private static Map<String, Double> flowGuessedMap = new TreeMap<String, Double>();
+    private static String[][] baseBsMatrix;
 
     public static void main(String[] args) {
         try {
@@ -27,6 +29,7 @@ public class Main {
             readPopulation();
             readDistance();
 
+            generateBaseBasMatrix();
             Graph graph = generateGraph();
 
             generateLinkWeightMatrixes(graph);
@@ -38,11 +41,28 @@ public class Main {
             generateGuessedFlowMap(graph);
             PrintUtils.printFlow(flowGuessedMap);
 
+            generateAbsoluteMistake();
+
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static void generateBaseBasMatrix() {
+        int size = PLACES.size();
+        baseBsMatrix = new String[size][size];
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                if (i == j)
+                    baseBsMatrix[i][j] = "0.0";
+                else
+                    baseBsMatrix[i][j] = "1.0";
+            }
+        }
+
+
     }
 
     private static void generateTripMap(Graph graph) {
@@ -91,12 +111,41 @@ public class Main {
         }
     }
 
-    private static void generateMattop() {
-        Double mattop = 0.0;
+    private static void generateAbsoluteMistake() {
 
-        for (String key : linkWeightMap.keySet()) {
-
+        for (int i = 0; i <= 20; i++) {
+            for (int j = 0; j <= 20; j++) {
+                generateMattop(i, j);
+            }
         }
+
+    }
+
+    private static void generateMattop(int x, int y) {
+        Double mattop = 0.0;
+        BigDecimal mt = new BigDecimal("0.0");
+        int i = 0, j = 1;
+        for (i = 0; i < linkWeightMap.keySet().size() - 1; i++) {
+            for (j = 1; j < linkWeightMap.keySet().size(); j++) {
+                Long iPop = populationMap.get(i);
+                Long jPop = populationMap.get(j);
+                BigDecimal popBd = new BigDecimal(iPop * jPop);
+                Double distance = distanceMap.get(i + "" + j);
+                BigDecimal distBd = new BigDecimal(distance);
+                try {
+                    popBd.pow(x);
+                    distBd.pow(y);
+                    //mattop += Math.pow(iPop * jPop, 3) / Math.pow(distance, 8);
+                    BigDecimal divide = popBd.divide(distBd);
+                    mt = mt.add(divide);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+            }
+        }
+        System.out.println("Mattop: " + mt);
+
     }
 
     private static void readPlaces() throws IOException {
